@@ -6,7 +6,16 @@ SSH config script
 
 ```
 export PATH=$PATH:$HOME/.local/bin
+```
+
+```
 python setup.py install --user
+```
+
+or
+
+```
+pip install sshas --user
 ```
 
 ## Usage
@@ -21,4 +30,3 @@ sshas add
 sshas mod
 sshas del
 ```
-
