@@ -5,7 +5,8 @@ SSH config script
 ## Install
 
 ```
-bash setup.sh
+export PATH=$PATH:$HOME/.local/bin
+python setup.py install --user
 ```
 
 ## Usage
