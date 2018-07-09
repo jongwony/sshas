@@ -44,8 +44,8 @@ args = parser.parse_args()
 op = args.opt
 
 ADD_TEMPLATE = '''Host {name}
-    HostName        {user}
-    User            {host}
+    HostName        {host}
+    User            {user}
     IdentityFile    {pem}
     Port            {port}
 '''
