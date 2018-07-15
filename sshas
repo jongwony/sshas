@@ -4,6 +4,7 @@ import sys
 import re
 import argparse
 import subprocess
+from itertools import takewhile, dropwhile, tee
 
 
 def get_path(*path, home=False):
@@ -15,19 +16,40 @@ def handle_file(name, append_args=None):
     with open(get_path('.ssh', 'config', home=True)) as f:
         data = f.readlines()
 
-    with open(get_path('.ssh', 'config', home=True), 'w') as f:
-        flag = True
-        for line in data:
-            if re.search(r'^Host {}'.format(name), line):
-                flag = False
-            elif not line.strip():
-                flag = True
+    it = dropwhile(lambda x: not re.search(r'^Host {}$'.format(name), x), data)
+    it = takewhile(lambda x: x.strip(), it)
+    out, parse = tee(it)
+    out = list(out)
+    print(*out)
+    if out:
+        resp = input('This configuration will be deleted. Continue[y/N]? ')
+        if not resp.strip().upper() == 'Y':
+            return
 
-            if flag:
-                f.write(line)
+        # rewrite except parsed elements
+        with open(get_path('.ssh', 'config', home=True), 'w') as f:
+            flag = True
+            for line in data:
+                if re.search(r'^Host {}$'.format(name), line):
+                    flag = False
 
-        if append_args is not None:
-            f.write(ADD_TEMPLATE.format(**append_args))
+                if flag:
+                    f.write(line)
+
+                if not flag and not line.strip():
+                    flag = True
+
+        # Host skip
+        next(parse)
+        return dict(s.split() for s in parse)
+    else:
+        return dict()
+
+
+def append_template(append_args):
+    with open(get_path('.ssh', 'config', home=True), 'a') as f:
+        f.write(ADD_TEMPLATE.format(**append_args))
+        f.write('\n')
 
 
 def red_color(s):
@@ -44,62 +66,69 @@ args = parser.parse_args()
 
 op = args.opt
 
-ADD_TEMPLATE = '''Host {name}
-    HostName        {host}
-    User            {user}
-    IdentityFile    {pem}
-    Port            {port}
+ADD_TEMPLATE = '''Host {Host}
+    HostName        {HostName}
+    User            {User}
+    IdentityFile    {IdentityFile}
+    Port            {Port}
 '''
+
+if not os.path.exists(get_path('.ssh', 'config', home=True)):
+    with open(get_path('.ssh', 'config', home=True), 'a'):
+        pass
 
 if op == 'list':
     subprocess.Popen("sed -n 'p' ~/.ssh/config | less -p '^Host .*$'", shell=True).communicate()
-
-elif op == 'del':
-    name = input('Delete Host: ').strip()
-    handle_file(name)
-    print('Delete {} successfully.'.format(name))
-
+    sys.exit(0)
 elif op == 'cb':
     cb = subprocess.check_output(['pbpaste']).decode().strip()
 
     try:
-        pem = re.search(r'''-i\s*(['"])(.*?)\1''', cb)
+        pem = re.search(r'''-i\s*(['" ])(.*?)\1''', cb)
         port = re.search(r'''-P\s*(\d+?)''', cb)
         connect_str = re.search(r'\b(\w+)(?::.*)?@(.*)\b', cb)
         host = connect_str.group(2)
 
         connect_args = {
-            'name': input('Host[{}]: '.format(connect_str.group(2))) or host,
-            'host': host,
-            'port': port.group(1) if port else 22,
-            'user': connect_str.group(1),
-            'pem': get_path(pem.group(2)) if pem else None,
+            'Host': input('Host[{}]: '.format(connect_str.group(2))) or host,
+            'HostName': host,
+            'Port': port.group(1) if port else 22,
+            'User': connect_str.group(1),
+            'IdentityFile': get_path(pem.group(2)) if pem else None,
         }
     except AttributeError:
         print('{}: {}'.format(red_color('Check your CLIPBOARD'), cyan_color(cb)), file=sys.stderr)
         sys.exit(0)
 
-    handle_file(connect_args['name'], connect_args)
-    print('Append {} successfully.'.format(connect_args['name']))
+    handle_file(connect_args['Host'])
+    append_template(connect_args)
+    print('Append {} successfully.'.format(connect_args['Host']))
+    sys.exit(0)
+
+
+name = input('Name: ').strip()
+connect_args = handle_file(name)
+
+if op == 'del':
+    if connect_args:
+        print('Delete {} successfully.'.format(name))
+    else:
+        print('Not Matching')
+
+    sys.exit(0)
+
+connect_args = {
+    'Host': name,
+    'HostName': input('HostName[{}]: '.format(connect_args.get('HostName'))).strip() or connect_args.get('HostName'),
+    'Port': input('Port[{}/22]: '.format(connect_args.get('Port'))).strip() or connect_args.get('Port') or 22,
+    'User': input('User[{}]: '.format(connect_args.get('User'))).strip() or connect_args.get('User'),
+    'IdentityFile': input('IdentityFile[{}]: '.format(connect_args.get('IdentityFile'))).strip() or connect_args.get('IdentityFile'),
+}
+
+if op == 'add':
+    append_template(connect_args)
+    print('Append {} successfully.'.format(name))
 
 else:
+    raise NotImplementedError
 
-    connect_args = {
-        'name': input('Name: '),
-        'host': input('HostName(IP): '),
-        'port': input('Port[22]: ') or 22,
-        'user': input('User: '),
-        'pem': input('Pem: '),
-    }
-
-    if op == 'add':
-        with open(get_path('.ssh', 'config', home=True), 'a') as f:
-            f.write(ADD_TEMPLATE.format(**connect_args))
-        print('Append {} successfully.'.format(connect_args['name']))
-
-    elif op == 'mod':
-        handle_file(connect_args['name'], connect_args)
-        print('Modify {} successfully.'.format(connect_args['name']))
-
-    else:
-        raise NotImplementedError

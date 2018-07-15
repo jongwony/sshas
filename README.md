@@ -5,6 +5,7 @@ SSH config script
 ## Install
 
 ```
+# optional
 export PATH=$PATH:$HOME/.local/bin
 ```
 
@@ -26,7 +27,9 @@ sshas -h
 
 sshas list
 sshas cb    # copy to clipboard before
-sshas add
-sshas mod
+sshas add   # add or modify config
 sshas del
 ```
+
+![](https://asciinema.org/a/kcOn02B2UUCmonxcNxlPRLSOa)
+
