@@ -31,4 +31,4 @@ sshas add   # add or modify config
 sshas del
 ```
 
-[![]()](https://asciinema.org/a/kcOn02B2UUCmonxcNxlPRLSOa)
+[![asciicast](https://asciinema.org/a/kcOn02B2UUCmonxcNxlPRLSOa.png)](https://asciinema.org/a/kcOn02B2UUCmonxcNxlPRLSOa)
